@@ -1,0 +1,2 @@
+python-qpid-proton>=0.40.0,<0.41
+solace-pubsubplus>=1.11.0,<1.12

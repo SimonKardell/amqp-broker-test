@@ -1,0 +1,67 @@
+services:
+  broker:
+    networks:
+      - solace_network
+    # working image
+    # image: solace/solace-pubsub-standard:10.26.0.9054
+    # not working image
+    image: solace/solace-pubsub-standard:10.26.0.9163
+    platform: linux/amd64
+    shm_size: 1g
+    ulimits:
+      nofile:
+        soft: 1048576
+        hard: 1048576
+    ports:
+      #SEMP / PubSub+ Manager
+      - "8080:8080"
+      #SMF (mapped to 55554 on host)
+      - "55554:55555"
+      # AMQP for dev vpn
+      - "4242:4242"
+    environment:
+      username_admin_globalaccesslevel: admin
+      username_admin_password: password
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:5550/health-check/guaranteed-active",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+  terraform-init:
+    image: hashicorp/terraform:1.10
+    networks:
+      - solace_network
+    volumes:
+      - ./terraform:/terraform
+      - terraform_volume:/terraform/.terraform
+    working_dir: /terraform
+    depends_on:
+      broker:
+        condition: service_healthy
+    command: init
+  terraform-apply:
+    image: hashicorp/terraform:1.10
+    networks:
+      - solace_network
+    volumes:
+      - ./terraform:/terraform
+      - terraform_volume:/terraform/.terraform
+    working_dir: /terraform
+    depends_on:
+      terraform-init:
+        condition: service_completed_successfully
+    command: >
+      apply -auto-approve
+      -var="broker_url=http://broker:8080"
+volumes:
+  terraform_volume:
+networks:
+  solace_network:
+    name: solace_network
